@@ -1,60 +1,86 @@
 package main
 
 import (
-	"fmt"
-)
+    "context"
+    "log"
+    "net/http"
+    "os"
+    "os/signal"
+    "syscall"
+    "time"
 
-const (
-    defaultPort = "3000"
+    "github.com/gin-gonic/gin"
+    "github.com/joho/godotenv"
+    "github.com/gatij/goUrlShortener/config"
+    "github.com/gatij/goUrlShortener/internal/api"
+    "github.com/gatij/goUrlShortener/internal/service"
+    "github.com/gatij/goUrlShortener/internal/storage/metrics"
+    "github.com/gatij/goUrlShortener/internal/storage/url"
 )
 
 func main() {
-	// Load .env file if it exists
+    // Load .env file if it exists
     if err := godotenv.Load(); err != nil {
-        log.Println("Error while loading .env file.")
+        log.Println("No .env file found or error loading it. Using environment variables.")
     }
 
-	// Configure port from environment or use default
-    port := os.Getenv("PORT")
-    if port == "" {
-        port = defaultPort
+    // Load configuration
+    cfg, err := config.Load()
+    if err != nil {
+        log.Fatalf("Failed to load configuration: %v", err)
     }
 
-	// Create a new Gin router
-    router := gin.Default()
-
-	// Root path handler
-    router.GET("/", func(c *gin.Context) {
-        c.String(http.StatusOK, "URL Shortener Service - API endpoints will be available soon")
-    })
-
-	// Redirect handler for shortened URLs
-    // This captures the shortCode parameter from the URL
-    router.GET("/:shortCode", func(c *gin.Context) {
-        shortCode := c.Param("shortCode")
-        
-        // For now, just show what we captured
-        // This will be replaced with actual URL lookup and redirect logic
-        c.String(http.StatusOK, "Will redirect short code: %s", shortCode)
-
-    })
-
-	// API routes will be added here
-    apiV1 := router.Group("/api/v1")
-    {
-        // Placeholder for metrics endpoint
-		// This will eventually return the top 3 hot domains
-		apiV1.GET("/metrics", func(c *gin.Context) {
-            c.JSON(http.StatusOK, gin.H{
-                "message": "Top 3 hot domains will be displayed here",
-            })
-        })
-        
-        // Placeholder for URL shortening endpoint
-        apiV1.POST("/urls", func(c *gin.Context) {
-            c.JSON(http.StatusNotImplemented, gin.H{
-                "message": "URL shortening coming soon",
-            })
-        })
+    // Set Gin mode based on environment
+    if os.Getenv("GIN_MODE") == "release" {
+        gin.SetMode(gin.ReleaseMode)
     }
+
+    // Initialize storage
+    urlStore := url.NewMemoryStorage()
+    metricsStore := metrics.NewMemoryStorage()
+
+    // Initialize services
+    metricsService := service.NewMetricsService(metricsStore)
+    shortenerConfig := service.ShortenerConfig{
+        BaseURL:    cfg.BaseURL,
+        CodeLength: cfg.CodeLength,
+    }
+    shortenerService := service.NewShortenerService(urlStore, metricsService, shortenerConfig)
+
+    // Setup router
+    router := api.SetupRouter(shortenerService, metricsService)
+
+    // Configure server
+    server := &http.Server{
+        Addr:         ":" + cfg.Port,
+        Handler:      router,
+        ReadTimeout:  10 * time.Second,
+        WriteTimeout: 10 * time.Second,
+        IdleTimeout:  60 * time.Second,
+    }
+
+    // Start server in a goroutine
+    go func() {
+        log.Printf("Starting server on port %s...", cfg.Port)
+        if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+            log.Fatalf("Server error: %v", err)
+        }
+    }()
+
+    // Wait for interrupt signal to gracefully shut down the server
+    quit := make(chan os.Signal, 1)
+    signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+    <-quit
+
+    log.Println("Shutting down server...")
+
+    // Create context with timeout for shutdown
+    ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+    defer cancel()
+
+    if err := server.Shutdown(ctx); err != nil {
+        log.Fatalf("Server forced to shutdown: %v", err)
+    }
+
+    log.Println("Server exited properly")
 }
