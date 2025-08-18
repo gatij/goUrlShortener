@@ -2,7 +2,6 @@ package service
 
 import (
     "context"
-    "errors"
 
     "github.com/gatij/goUrlShortener/internal/model"
     "github.com/gatij/goUrlShortener/internal/storage/metrics"
@@ -31,16 +30,20 @@ func (s *MetricsService) GetTopDomains(ctx context.Context, limit int) ([]model.
 
 // IncrementDomainShortenCount increments the shorten count for a domain
 func (s *MetricsService) IncrementDomainShortenCount(ctx context.Context, domain string) error {
-    // Try to get existing metrics
-    metrics, err := s.getDomainMetrics(ctx, domain)
+    // Direct lookup - O(1) operation
+    metrics, exists, err := s.metricsStore.GetDomainMetrics(ctx, domain)
     if err != nil {
+        return err
+    }
+    
+    if !exists {
         // Create new metrics if not found
         metrics = model.DomainMetrics{
-            Domain:       domain,
-            ShortenCount: 1, // Initialize with 1 for new domains
+            Domain:      domain,
+            ShortenCount: 1, // Initialize with 1
         }
     } else {
-        // Increment counter for existing domains
+        // Increment counter for existing domain
         metrics.ShortenCount++
     }
     

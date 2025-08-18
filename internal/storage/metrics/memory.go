@@ -112,3 +112,15 @@ func (s *MemoryStorage) GetTopDomains(ctx context.Context, limit int) ([]model.D
     
     return result, nil
 }
+
+func (s *MemoryStorage) GetDomainMetrics(ctx context.Context, domain string) (model.DomainMetrics, bool, error) {
+    s.mu.RLock()
+    defer s.mu.RUnlock()
+    
+    metrics, exists := s.domains[domain]
+    if !exists {
+        return model.DomainMetrics{}, false, nil
+    }
+    
+    return metrics, true, nil
+}

@@ -2,7 +2,6 @@ package url
 
 import (
     "context"
-    "time"
 
     "github.com/gatij/goUrlShortener/internal/model"
 )

@@ -42,6 +42,30 @@ CODE_LENGTH=6
 go run cmd/server/main.go
 ```
 
+### Docker
+
+You can also run the application using Docker:
+
+1. Build and start the container
+```bash
+docker-compose up -d
+```
+
+2. Stop the container
+```bash
+docker-compose down
+```
+
+Alternatively, you can build and run the Docker image directly:
+
+```bash
+# Build the Docker image
+docker build -t urlshortener .
+
+# Run the container
+docker run -p 8080:8080 -e PORT=8080 -e BASE_URL=http://localhost:8080 -e CODE_LENGTH=6 urlshortener
+```
+
 ## API Documentation
 
 ### Shorten a URL

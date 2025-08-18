@@ -13,4 +13,7 @@ type Storage interface {
 
 	// GetTopDomains retrieves the top N domains based on shorten count
 	GetTopDomains(ctx context.Context, limit int) ([]model.DomainMetrics, error)
+
+	// GetDomainMetrics retrieves metrics for a specific domain
+    GetDomainMetrics(ctx context.Context, domain string) (model.DomainMetrics, bool, error)
 }

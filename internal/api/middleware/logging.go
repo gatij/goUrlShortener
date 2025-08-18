@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"strconv"
     "time"
 
     "github.com/gin-gonic/gin"
@@ -26,10 +27,11 @@ func Logger() gin.HandlerFunc {
         path := c.Request.URL.Path
 
         // Log request
-        gin.DefaultWriter.Write([]byte(
-            "[GIN] " + endTime.Format("2006/01/02 - 15:04:05") +
-                " | " + statusCode + " | " + latency.String() +
-                " | " + clientIP + " | " + method + " | " + path + "\n",
-        ))
+		gin.DefaultWriter.Write([]byte(
+			"[GIN] " + endTime.Format("2006/01/02 - 15:04:05") +
+			" | " + strconv.Itoa(statusCode) + 
+			" | " + latency.String() +
+			" | " + clientIP + " | " + method + " | " + path + "\n",
+		))
     }
 }
