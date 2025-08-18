@@ -11,6 +11,12 @@ A simple, scalable URL shortener service written in Go.
 - HTTPS enforcement and validation
 - Infinite loop prevention
 
+## Architecture
+
+![URL Shortener Architecture](ArchitectureUrlShortner.png)
+
+The above diagram illustrates the high-level architecture of the URL shortener service, showing the flow of requests and the interaction between different components.
+
 ## Getting Started
 
 ### Prerequisites
