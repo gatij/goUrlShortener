@@ -4,10 +4,10 @@ services:
   app:
     build: .
     ports:
-      - "8080:8080"
+      - "3000:3000"
     environment:
-      - PORT=8080
-      - BASE_URL=http://localhost:8080
+      - PORT=3000
+      - BASE_URL=http://localhost:3000
       - CODE_LENGTH=6
       - GIN_MODE=release
     restart: unless-stopped
