@@ -99,6 +99,14 @@ func (s *MemoryStorage) GetTopDomains(ctx context.Context, limit int) ([]model.D
     h := make(DomainMaxHeap, len(*s.domainHeap))
     copy(h, *s.domainHeap)
     
+    // If limit is 0 or negative, use all domains
+    if limit <= 0 {
+        limit = len(h)
+        if limit == 0 {
+            return []model.DomainMetrics{}, nil
+        }
+    }
+    
     // Extract top N domains
     result := make([]model.DomainMetrics, 0, limit)
     count := 0

@@ -23,6 +23,9 @@ func SetupRouter(
     redirectHandler := handlers.NewRedirectHandler(shortenerService)
     metricsHandler := handlers.NewMetricsHandler(metricsService)
 
+	// Root endpoint - provides service information
+    router.GET("/", handlers.RootHandler)
+
     // API routes
     api := router.Group("/api/v1")
     {

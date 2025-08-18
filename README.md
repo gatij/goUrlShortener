@@ -63,7 +63,7 @@ Alternatively, you can build and run the Docker image directly:
 docker build -t urlshortener .
 
 # Run the container
-docker run -p 8080:8080 -e PORT=8080 -e BASE_URL=http://localhost:8080 -e CODE_LENGTH=6 urlshortener
+docker run -p 3000:3000 -e PORT=3000 -e BASE_URL=http://localhost:3000 -e CODE_LENGTH=6 urlshortener
 ```
 
 ## API Documentation
@@ -84,7 +84,7 @@ Response:
 ```json
 {
   "short_code": "ab12cd",
-  "short_url": "http://localhost:8080/ab12cd",
+  "short_url": "http://localhost:3000/ab12cd",
   "original_url": "https://example.com/very/long/url/that/needs/shortening"
 }
 ```
