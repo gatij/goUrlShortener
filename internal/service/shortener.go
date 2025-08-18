@@ -52,7 +52,18 @@ func (s *ShortenerService) CreateShortURL(ctx context.Context, originalURL strin
     // Use normalized URL with HTTPS
     normalizedURL := urlInfo.NormalizedURL
     
-    // Generate short code
+    // Check if URL already exists in storage
+    existingURL, err := s.urlStore.GetByOriginalURL(ctx, normalizedURL)
+    if err == nil {
+        // URL already exists, return it
+        // No need to update metrics as it's not a new shortening
+        return existingURL, nil
+    } else if err != urlStorage.ErrURLNotFound {
+        // Unexpected error occurred
+        return model.URL{}, err
+    }
+    
+    // URL doesn't exist, create a new short code
     shortCode, err := utils.GenerateShortCode(s.config.CodeLength)
     if err != nil {
         return model.URL{}, err
@@ -72,6 +83,7 @@ func (s *ShortenerService) CreateShortURL(ctx context.Context, originalURL strin
     }
     
     // Extract domain and update metrics asynchronously
+    // Only increment metrics for new URLs
     domain := urlInfo.Domain
     go s.metricsService.IncrementDomainShortenCount(ctx, domain)
     

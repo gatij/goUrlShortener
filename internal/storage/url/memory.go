@@ -5,6 +5,7 @@ import (
     "errors"
     "sync"
 
+    "github.com/PuerkitoBio/purell"
     "github.com/gatij/goUrlShortener/internal/model"
 )
 
@@ -18,17 +19,36 @@ var (
 
 // MemoryStorage implements the Storage interface with in-memory data structures
 type MemoryStorage struct {
-    urls      map[string]model.URL  // Maps ID to URL object
-    shortCodes map[string]string    // Maps short code to ID for quick lookups
-    mu        sync.RWMutex          // Protects the maps from concurrent access
+    urls              map[string]model.URL  // Maps ID to URL object
+    shortToURL        map[string]string     // Maps short code to ID
+    normalizedToShort map[string]string     // Maps normalized URL to short code
+    mu                sync.RWMutex          // Protects the maps from concurrent access
 }
 
 // NewMemoryStorage creates a new in-memory URL storage
 func NewMemoryStorage() *MemoryStorage {
     return &MemoryStorage{
-        urls:      make(map[string]model.URL),
-        shortCodes: make(map[string]string),
+        urls:              make(map[string]model.URL),
+        shortToURL:        make(map[string]string),
+        normalizedToShort: make(map[string]string),
     }
+}
+
+// normalizeURL standardizes a URL for consistent lookups using purell
+func (s *MemoryStorage) normalizeURL(rawURL string) string {
+    // Define normalization flags
+    flags := purell.FlagsSafe | purell.FlagRemoveTrailingSlash | 
+             purell.FlagRemoveDotSegments | purell.FlagRemoveDuplicateSlashes |
+             purell.FlagSortQuery | purell.FlagRemoveEmptyQuerySeparator
+
+    // Normalize the URL
+    normalized, err := purell.NormalizeURLString(rawURL, flags)
+    if err != nil {
+        // If normalization fails, return the original URL
+        return rawURL
+    }
+    
+    return normalized
 }
 
 // Save stores a new shortened URL
@@ -41,13 +61,29 @@ func (s *MemoryStorage) Save(ctx context.Context, url model.URL) error {
         return ErrURLExists
     }
     
+    // Normalize the original URL
+    normalizedURL := s.normalizeURL(url.Original)
+    
+    // Check if the normalized URL already exists
+    if existingShort, exists := s.normalizedToShort[normalizedURL]; exists {
+        // Return the existing URL object
+        id := s.shortToURL[existingShort]
+        existingURL := s.urls[id]
+        
+        // Update the provided URL object with existing values (for return by reference)
+        url = existingURL
+        
+        return nil
+    }
+    
     // Store URL by ID
     s.urls[url.ID] = url
     
-    // Store mapping from short code to ID for quick lookups
-    // Note: In this implementation, we're assuming the short code is the same as ID
-    // If they're different in your model, adjust accordingly
-    s.shortCodes[url.ID] = url.ID
+    // Store mapping from short code to ID
+    s.shortToURL[url.ShortCode] = url.ID
+    
+    // Store mapping from normalized original URL to short code
+    s.normalizedToShort[normalizedURL] = url.ShortCode
     
     return nil
 }
@@ -71,13 +107,32 @@ func (s *MemoryStorage) GetByShortCode(ctx context.Context, shortCode string) (m
     defer s.mu.RUnlock()
     
     // Look up ID from short code
-    id, exists := s.shortCodes[shortCode]
+    id, exists := s.shortToURL[shortCode]
     if !exists {
         return model.URL{}, ErrURLNotFound
     }
     
     // Get URL by ID
-    return s.GetByID(ctx, id)
+    return s.urls[id], nil
+}
+
+// GetByOriginalURL retrieves a URL by its original URL
+func (s *MemoryStorage) GetByOriginalURL(ctx context.Context, originalURL string) (model.URL, error) {
+    s.mu.RLock()
+    defer s.mu.RUnlock()
+    
+    // Normalize the URL for consistent lookup
+    normalizedURL := s.normalizeURL(originalURL)
+    
+    // Direct lookup from normalized URL to short code - O(1)
+    shortCode, exists := s.normalizedToShort[normalizedURL]
+    if !exists {
+        return model.URL{}, ErrURLNotFound
+    }
+    
+    // Get URL using the short code
+    id := s.shortToURL[shortCode]
+    return s.urls[id], nil
 }
 
 // Delete removes a URL from storage
@@ -90,9 +145,14 @@ func (s *MemoryStorage) Delete(ctx context.Context, id string) error {
         return ErrURLNotFound
     }
     
-    // Remove from both maps
+    // Get the short code and normalize the original URL before deleting
+    shortCode := url.ShortCode
+    normalizedURL := s.normalizeURL(url.Original)
+    
+    // Remove from all maps
     delete(s.urls, id)
-    delete(s.shortCodes, url.ID) // Assuming ID is the short code
+    delete(s.shortToURL, shortCode)
+    delete(s.normalizedToShort, normalizedURL)
     
     return nil
 }

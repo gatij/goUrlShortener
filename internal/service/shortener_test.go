@@ -46,6 +46,15 @@ func (m *MockURLStorage) GetByShortCode(ctx context.Context, shortCode string) (
 	return model.URL{}, url.ErrURLNotFound
 }
 
+func (m *MockURLStorage) GetByOriginalURL(ctx context.Context, originalURL string) (model.URL, error) {
+	for _, urlObj := range m.urls {
+		if urlObj.Original == originalURL {
+			return urlObj, nil
+		}
+	}
+	return model.URL{}, url.ErrURLNotFound
+}
+
 func (m *MockURLStorage) Delete(ctx context.Context, id string) error {
 	if _, exists := m.urls[id]; !exists {
 		return url.ErrURLNotFound
@@ -87,6 +96,13 @@ func (s *TestShortenerService) CreateShortURL(ctx context.Context, originalURL s
 	parsedURL, err := utils.ValidateURL(originalURL)
 	if err != nil {
 		return model.URL{}, ErrInvalidURL
+	}
+
+	// Check if URL already exists in storage
+	existingURL, err := s.urlStore.GetByOriginalURL(ctx, originalURL)
+	if err == nil {
+		// URL already exists, return it
+		return existingURL, nil
 	}
 
 	// Generate short code

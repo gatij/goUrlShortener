@@ -17,6 +17,9 @@ type Storage interface {
     // GetByShortCode retrieves a URL by its short code
     GetByShortCode(ctx context.Context, shortCode string) (model.URL, error)
 
+	// GetByOriginalURL retrieves a URL by its original URL
+    GetByOriginalURL(ctx context.Context, originalURL string) (model.URL, error)
+
     // Delete removes a URL from storage
     Delete(ctx context.Context, id string) error
 }
